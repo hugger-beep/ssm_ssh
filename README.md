@@ -115,11 +115,10 @@ graph TB
 - **Critical**: Solves the core performance bottleneck affecting daily workflows
 - **ML-Specific**: Handles large file transfers (10GB+ models) efficiently
 - **Developer Experience**: Maintains familiar SSH-based development patterns
-- **Cost-Effective**: ~$108/month is minimal compared to developer productivity loss
 - **Future-Proof**: Scales with team growth and additional GPU instances
 
 #### ⚠️ Why NOT to Choose:
-- **Budget Constraints**: If monthly VPN costs are prohibitive
+- **Budget Constraints**: If operational costs are a concern
 - **Temporary Usage**: For infrequent or short-term development needs
 - **Complex Compliance**: If organization requires zero-trust network model
 - **Multi-Region Teams**: If developers are distributed across regions
@@ -180,16 +179,131 @@ graph TD
 - **Temporary Fix**: Will need replacement as team/usage grows
 - **Limited ROI**: Effort investment doesn't match performance gains
 
-**SSH Config Optimization:**
+#### 📋 Migration Checklist:
+- [ ] Backup current SSH configurations
+- [ ] Update SSM Session Manager preferences
+- [ ] Test enhanced SSH config on single developer machine
+- [ ] Verify Jupyter notebook port forwarding
+- [ ] Update internal tooling scripts
+- [ ] Document new connection procedures
+- [ ] Train team on new SSH multiplexing features
+- [ ] Monitor performance improvements
+- [ ] Plan rollback procedure if issues arise
+
+#### Implementation Steps:
+
+**Step 1: Update SSM Session Manager Preferences**
+```json
+{
+  "schemaVersion": "1.0",
+  "description": "Document to hold regional settings for Session Manager",
+  "sessionType": "Standard_Stream",
+  "inputs": {
+    "s3BucketName": "",
+    "s3KeyPrefix": "",
+    "s3EncryptionEnabled": true,
+    "cloudWatchLogGroupName": "",
+    "cloudWatchEncryptionEnabled": true,
+    "idleSessionTimeout": "60",
+    "maxSessionDuration": "120",
+    "runAsEnabled": false,
+    "runAsDefaultUser": "",
+    "shellProfile": {
+      "windows": "",
+      "linux": "exec /bin/bash"
+    }
+  }
+}
+```
+
+**Step 2: Optimize SSH Client Configuration**
 ```bash
+# Enhanced ~/.ssh/config
 Host devbox-*
+    # Connection multiplexing for reuse
     ControlMaster auto
     ControlPath ~/.ssh/control-%r@%h:%p
-    ControlPersist 10m
-    ServerAliveInterval 60
-    ServerAliveCountMax 3
+    ControlPersist 30m
+    
+    # Keep connections alive
+    ServerAliveInterval 30
+    ServerAliveCountMax 6
+    TCPKeepAlive yes
+    
+    # Compression for better throughput
+    Compression yes
+    CompressionLevel 6
+    
+    # Faster connection establishment
+    GSSAPIAuthentication no
+    
+    # SSM Proxy command
     ProxyCommand sh -c "aws --profile '...' ssm start-session --target %h --document-name AWS-StartSSHSession --parameters 'portNumber=%p'"
 ```
+
+**Step 3: Configure Port Forwarding for Jupyter**
+```bash
+# Add to ~/.ssh/config for Jupyter access
+Host devbox-jupyter-*
+    LocalForward 8888 localhost:8888
+    LocalForward 8889 localhost:8889
+    LocalForward 6006 localhost:6006  # TensorBoard
+    # Include all settings from devbox-* above
+```
+
+**Step 4: Update Internal Tooling**
+```bash
+# Modify tooling to use optimized SSH settings
+# Example: Update connection establishment
+ssh -o "ControlMaster=auto" -o "ControlPersist=30m" devbox-${INSTANCE_ID}
+
+# For file transfers, use existing connections
+scp -o "ControlMaster=auto" large_model.pkl devbox-${INSTANCE_ID}:/workspace/
+```
+
+#### What Changes from Current Setup:
+
+**Current State:**
+- Basic SSM proxy configuration
+- No connection reuse
+- Default timeouts (20 minutes idle)
+- No compression
+- Each SSH command creates new SSM session
+
+**Enhanced State:**
+- **Connection Multiplexing**: Reuses existing connections for 30 minutes
+- **Extended Timeouts**: 60-minute idle, 120-minute max session
+- **Compression**: Reduces data transfer overhead
+- **Keep-Alive**: Prevents connection drops during idle periods
+- **Port Forwarding**: Direct Jupyter notebook access
+- **Optimized Authentication**: Faster connection establishment
+
+#### Implementation Notes:
+
+**⚠️ Important Considerations:**
+- **Session Manager Preferences**: Must be configured at AWS account/region level
+- **IAM Permissions**: Ensure developers have `ssm:UpdateDocumentDefaultVersion` for preferences
+- **SSH Client Version**: Requires OpenSSH 5.6+ for ControlMaster features
+- **Firewall/Proxy**: Corporate networks may interfere with multiplexed connections
+
+**🔧 Troubleshooting:**
+- **Connection Hangs**: Reduce ControlPersist time or disable ControlMaster
+- **Permission Denied**: Check SSM agent version on EC2 instances (requires 3.0+)
+- **Port Conflicts**: Adjust LocalForward ports if 8888/8889 are in use
+- **Slow File Transfers**: Experiment with CompressionLevel (1-9)
+
+**📊 Expected Improvements:**
+- **Connection Time**: 50-70% faster for subsequent connections
+- **File Transfer**: 15-25% improvement with compression
+- **Session Stability**: Fewer disconnections during idle periods
+- **Jupyter Access**: Direct port forwarding eliminates browser proxy issues
+
+**🚀 Quick Implementation (30 minutes):**
+1. Update Session Manager preferences via AWS Console
+2. Backup and modify ~/.ssh/config on developer machines
+3. Test connection multiplexing with `ssh -O check devbox-test`
+4. Verify Jupyter port forwarding works
+5. Update internal tooling scripts to use optimized settings
 
 ### Option 3: Hybrid Approach
 
@@ -245,7 +359,6 @@ graph TB
 | **Stability** | High | Variable | Improved | High | Variable |
 | **Security** | Public access risk | Fully private | Fully private | Private via VPN | Private |
 | **Setup Complexity** | Low | Medium | Low | High | Very High |
-| **Monthly Cost** | $0 | $0 | $0 | ~$108 | ~$108+ |
 | **ML Workflow Impact** | None | Severe | Moderate | None | Depends on usage |
 | **Compliance** | ❌ Fails | ✅ Passes | ✅ Passes | ✅ Passes | ✅ Passes |
 | **Developer Satisfaction** | High | Low | Medium-Low | High | Medium |
@@ -264,8 +377,22 @@ graph TB
 - Enhanced SSM: 3-8 second delays
 - Client VPN + SSH: Real-time rendering
 
+## Implementation Roadmap
 
-
+```mermaid
+gantt
+    title SSM to VPN Migration Timeline
+    dateFormat  YYYY-MM-DD
+    section Phase 1
+    VPN Endpoint Setup    :2024-01-01, 1w
+    Certificate Config    :2024-01-08, 3d
+    section Phase 2
+    Tooling Updates      :2024-01-11, 1w
+    Testing & Validation :2024-01-18, 1w
+    section Phase 3
+    Team Migration       :2024-01-25, 2w
+    Documentation        :2024-02-01, 1w
+```
 
 ## Security Considerations
 
@@ -303,7 +430,6 @@ graph TD
 ### Choose AWS Client VPN If:
 - ✅ Team downloads/uploads large files (>1GB) regularly
 - ✅ Real-time Jupyter visualization is critical
-- ✅ Budget allows ~$108/month operational cost
 - ✅ Team size is 5+ developers
 - ✅ Development workflow performance directly impacts delivery
 - ✅ Can invest 2-3 weeks in setup and migration
@@ -336,7 +462,7 @@ graph TD
 ### Short-term (Weeks 2-4):
 1. **Pilot AWS Client VPN** with 2-3 developers
 2. **Compare performance metrics** between SSM and VPN
-3. **Document cost impact** and ROI analysis
+3. **Evaluate operational impact** and productivity gains
 
 ### Long-term (Month 2+):
 1. **Full VPN migration** based on pilot results
@@ -352,3 +478,4 @@ graph TD
 5. Are there any network policies that might affect VPN implementation?
 
 ---
+
