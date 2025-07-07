@@ -349,7 +349,7 @@ graph TB
 - **Developer Experience**: Inconsistent performance creates workflow confusion
 - **Long-term Maintenance**: Requires ongoing management of both systems
 
-## Performance Comparison
+## Performance Comparison - estimation
 
 | Metric | Direct SSH | SSM Session Manager | Enhanced SSM | Client VPN + SSH | Hybrid Approach |
 |--------|------------|-------------------|--------------|------------------|------------------|
