@@ -1408,14 +1408,14 @@ gantt
     title SSM to VPN Migration Timeline
     dateFormat  YYYY-MM-DD
     section Phase 1
-    VPN Endpoint Setup    :2024-01-01, 1w
-    Certificate Config    :2024-01-08, 3d
+    VPN Endpoint Setup    :2025-07-01, 1w
+    Certificate Config    :2025-07-08, 3d
     section Phase 2
-    Tooling Updates      :2024-01-11, 1w
-    Testing & Validation :2024-01-18, 1w
+    Tooling Updates      :2025-07-11, 1w
+    Testing & Validation :2025-07-18, 1w
     section Phase 3
-    Team Migration       :2024-01-25, 2w
-    Documentation        :2024-02-01, 1w
+    Team Migration       :2025-07-25, 2w
+    Documentation        :2025-08-01, 1w
 ```
 
 ## Security Considerations
